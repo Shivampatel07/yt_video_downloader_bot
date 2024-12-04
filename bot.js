@@ -6,6 +6,13 @@ require('dotenv').config();
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
+const downloadsDir = path.join(__dirname, 'downloads');
+
+// Ensure the downloads directory exists
+if (!fs.existsSync(downloadsDir)) {
+    fs.mkdirSync(downloadsDir, { recursive: true });
+}
+
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, 'Send a YouTube URL to get the video.');
 });
@@ -16,7 +23,7 @@ bot.on('message', async (msg) => {
 
     if (ytdl.validateURL(url)) {
         bot.sendMessage(chatId, 'Downloading your video...');
-        const outputPath = path.join(__dirname, 'downloads', 'video.mp4');
+        const outputPath = path.join(downloadsDir, 'video.mp4');
 
         try {
             const videoStream = ytdl(url, { quality: 'highestvideo' });
@@ -29,8 +36,13 @@ bot.on('message', async (msg) => {
                     fs.unlinkSync(outputPath); // Clean up
                 });
             });
+
+            writeStream.on('error', (err) => {
+                console.error('Stream Write Error:', err);
+                bot.sendMessage(chatId, 'An error occurred during the download.');
+            });
         } catch (err) {
-            console.error(err);
+            console.error('Download Error:', err);
             bot.sendMessage(chatId, 'Error downloading the video.');
         }
     } else {
